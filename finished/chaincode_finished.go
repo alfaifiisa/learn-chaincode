@@ -108,39 +108,6 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string
 }
 
 //==============================================================================================================================
-//	 General Functions
-//==============================================================================================================================
-//	 get_ecert - Takes the name passed and calls out to the REST API for HyperLedger to retrieve the ecert
-//				 for that user. Returns the ecert as retrived including html encoding.
-//==============================================================================================================================
-func (t *SimpleChaincode) get_ecert(stub shim.ChaincodeStubInterface, name string) ([]byte, error) {
-
-	ecert, err := stub.GetState(name)
-
-	if err != nil {
-		return nil, errors.New("Couldn't retrieve ecert for user " + name)
-	}
-
-	return ecert, nil
-}
-
-//==============================================================================================================================
-//	 add_ecert - Adds a new ecert and user pair to the table of ecerts
-//==============================================================================================================================
-
-func (t *SimpleChaincode) add_ecert(stub shim.ChaincodeStubInterface, name string, ecert string) ([]byte, error) {
-
-	err := stub.PutState(name, []byte(ecert))
-
-	if err == nil {
-		return nil, errors.New("Error storing eCert for user " + name + " identity: " + ecert)
-	}
-
-	return nil, nil
-
-}
-
-//==============================================================================================================================
 //	 check_affiliation - Takes an ecert as a string, decodes it to remove html encoding then parses it and checks the
 // 				  		certificates common name. The affiliation is stored as part of the common name.
 //==============================================================================================================================
@@ -203,8 +170,8 @@ func (t *SimpleChaincode) save_changes(stub shim.ChaincodeStubInterface, b Bond)
 //		  initial arguments passed to other things for use in the called function e.g. name -> ecert
 //==============================================================================================================================
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-
 	var b []byte
+
 	if function == "create_bond" {
 		return t.create_bond(stub, args)
 	} else if function == "ping" {
@@ -220,6 +187,13 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 			fmt.Printf("INVOKE: Error retrieving v5c: %s", err)
 			return nil, errors.New("Error retrieving v5c")
 		}
+
+	} else if function == "change_bond_status" {
+		bond, err := t.retrieve_bond(stub, args[0])
+		if err != nil {
+			return nil, errors.New("cannot find bond by given realestateID")
+		}
+		b, err = t.change_bond_status(stub, bond, args[1])
 	} else {
 		return nil, errors.New("Function of the name " + function + " doesn't exist.")
 	}
@@ -235,7 +209,7 @@ func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 	if function == "get_bond_details" {
 		if len(args) != 1 {
 			fmt.Printf("Incorrect number of arguments passed")
-			return nil, errors.New("QUERY: Incorrect number of arguments passed")
+			return []byte("error"), errors.New("QUERY: Incorrect number of arguments passed")
 		}
 		b, err := t.retrieve_bond(stub, args[0])
 		if err != nil {
@@ -342,6 +316,20 @@ func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, args []s
 func (t *SimpleChaincode) transfer_ownership(stub shim.ChaincodeStubInterface, b Bond, recipient_national_id string) ([]byte, error) {
 
 	b.OwnerNationalID = recipient_national_id // then make the owner the new owner
+
+	_, err := t.save_changes(stub, b) // Write new state
+
+	if err != nil {
+		fmt.Printf("AUTHORITY_TO_MANUFACTURER: Error saving changes: %s", err)
+		return nil, errors.New("Error saving changes")
+	}
+
+	return nil, nil // We are Done
+
+}
+func (t *SimpleChaincode) change_bond_status(stub shim.ChaincodeStubInterface, b Bond, newStatus string) ([]byte, error) {
+
+	b.Status = newStatus // then make the owner the new owner
 
 	_, err := t.save_changes(stub, b) // Write new state
 
