@@ -299,7 +299,7 @@ func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, args []s
 	record, err := stub.GetState(b.RealEstateID) // If not an error then a record exists so cant create a new car with this V5cID as it must be unique
 
 	if record != nil {
-		return nil, errors.New("Bond already exists")
+		return []byte("error"), errors.New("Bond already exists")
 	}
 
 	_, err = t.save_changes(stub, b)
