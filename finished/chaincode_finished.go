@@ -108,6 +108,39 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string
 }
 
 //==============================================================================================================================
+//	 General Functions
+//==============================================================================================================================
+//	 get_ecert - Takes the name passed and calls out to the REST API for HyperLedger to retrieve the ecert
+//				 for that user. Returns the ecert as retrived including html encoding.
+//==============================================================================================================================
+func (t *SimpleChaincode) get_ecert(stub shim.ChaincodeStubInterface, name string) ([]byte, error) {
+
+	ecert, err := stub.GetState(name)
+
+	if err != nil {
+		return nil, errors.New("Couldn't retrieve ecert for user " + name)
+	}
+
+	return ecert, nil
+}
+
+//==============================================================================================================================
+//	 add_ecert - Adds a new ecert and user pair to the table of ecerts
+//==============================================================================================================================
+
+func (t *SimpleChaincode) add_ecert(stub shim.ChaincodeStubInterface, name string, ecert string) ([]byte, error) {
+
+	err := stub.PutState(name, []byte(ecert))
+
+	if err == nil {
+		return nil, errors.New("Error storing eCert for user " + name + " identity: " + ecert)
+	}
+
+	return nil, nil
+
+}
+
+//==============================================================================================================================
 //	 check_affiliation - Takes an ecert as a string, decodes it to remove html encoding then parses it and checks the
 // 				  		certificates common name. The affiliation is stored as part of the common name.
 //==============================================================================================================================
