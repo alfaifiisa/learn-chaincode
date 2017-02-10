@@ -47,7 +47,7 @@ type SimpleChaincode struct {
 
 type Bond struct {
 	ID              string `json:"id"`
-	RealEstateID    string `json:"id"`                // blueprint_number.readestate_number ex: 1232.21
+	RealEstateID    string `json:"real_estate_id"`    // blueprint_number.readestate_number ex: 1232.21
 	OwnerNationalID string `json:"owner_national_id"` // national_id
 	Status          string `json:"status"`            // flat, built
 	Area            string `json:"area"`              // example:
@@ -299,7 +299,7 @@ func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, args []s
 	record, err := stub.GetState(b.RealEstateID) // If not an error then a record exists so cant create a new car with this V5cID as it must be unique
 
 	if record != nil {
-		return []byte("error"), errors.New("Bond already exists")
+		return nil, errors.New("Bond already exists")
 	}
 
 	_, err = t.save_changes(stub, b)
