@@ -273,6 +273,8 @@ func (t *SimpleChaincode) ping(stub shim.ChaincodeStubInterface) ([]byte, error)
 //=================================================================================================================================
 func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 
+	fmt.Println("inside create_bond", args)
+
 	var b Bond
 
 	b.ID = args[0]
