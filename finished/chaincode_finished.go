@@ -221,7 +221,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		}
 		return b, nil
 
-	} else if function == "change_bond_status" {
+	} else if function == "change_realestate_status" {
 		bond, err := t.retrieve_bond(stub, args[0])
 		if err != nil {
 			return nil, errors.New("cannot find bond by given realestateID")
