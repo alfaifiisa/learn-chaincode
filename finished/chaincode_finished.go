@@ -203,7 +203,6 @@ func (t *SimpleChaincode) save_changes(stub shim.ChaincodeStubInterface, b Bond)
 //		  initial arguments passed to other things for use in the called function e.g. name -> ecert
 //==============================================================================================================================
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-	var b []byte
 
 	if function == "create_bond" {
 		return t.create_bond(stub, args)
@@ -214,23 +213,24 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		if err != nil {
 			return nil, errors.New("cannot find bond by given realestateID")
 		}
-		b, err = t.transfer_ownership(stub, bond, args[1])
+		b, err := t.transfer_ownership(stub, bond, args[1])
 
 		if err != nil {
 			fmt.Printf("INVOKE: Error retrieving v5c: %s", err)
 			return nil, errors.New("Error retrieving v5c")
 		}
+		return b, nil
 
 	} else if function == "change_bond_status" {
 		bond, err := t.retrieve_bond(stub, args[0])
 		if err != nil {
 			return nil, errors.New("cannot find bond by given realestateID")
 		}
-		b, err = t.change_bond_status(stub, bond, args[1])
-	} else {
-		return nil, errors.New("Function of the name " + function + " doesn't exist.")
+		return t.change_bond_status(stub, bond, args[1])
+
 	}
-	return b, nil
+
+	return nil, errors.New("Received unknown function invocation " + function)
 }
 
 //=================================================================================================================================
