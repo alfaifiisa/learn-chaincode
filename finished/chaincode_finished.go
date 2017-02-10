@@ -141,55 +141,14 @@ func (t *SimpleChaincode) add_ecert(stub shim.ChaincodeStubInterface, name strin
 }
 
 //==============================================================================================================================
-//	 get_caller - Retrieves the username of the user who invoked the chaincode.
-//				  Returns the username as a string.
-//==============================================================================================================================
-
-func (t *SimpleChaincode) get_username(stub shim.ChaincodeStubInterface) (string, error) {
-
-	username, err := stub.ReadCertAttribute("username")
-	if err != nil {
-		return "", errors.New("Couldn't get attribute 'username'. Error: " + err.Error())
-	}
-	return string(username), nil
-}
-
-//==============================================================================================================================
 //	 check_affiliation - Takes an ecert as a string, decodes it to remove html encoding then parses it and checks the
 // 				  		certificates common name. The affiliation is stored as part of the common name.
 //==============================================================================================================================
-
-func (t *SimpleChaincode) check_affiliation(stub shim.ChaincodeStubInterface) (string, error) {
-	affiliation := AUTHORITY
-
-	return string(affiliation), nil
-
-}
 
 //==============================================================================================================================
 //	 get_caller_data - Calls the get_ecert and check_role functions and returns the ecert and role for the
 //					 name passed.
 //==============================================================================================================================
-
-func (t *SimpleChaincode) get_caller_data(stub shim.ChaincodeStubInterface) (string, string, error) {
-
-	user, err := t.get_username(stub)
-
-	// if err != nil { return "", "", err }
-
-	// ecert, err := t.get_ecert(stub, user);
-
-	// if err != nil { return "", "", err }
-
-	affiliation, err := t.check_affiliation(stub)
-
-	if err != nil {
-		return "", "", err
-	}
-
-	return user, affiliation, nil
-}
-
 //==============================================================================================================================
 //	 retrieve_v5c - Gets the state of the data at v5cID in the ledger then converts it from the stored
 //					JSON into the Vehicle struct for use in the contract. Returns the Vehcile struct.
@@ -245,14 +204,9 @@ func (t *SimpleChaincode) save_changes(stub shim.ChaincodeStubInterface, b Bond)
 //==============================================================================================================================
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 
-	caller, caller_affiliation, err := t.get_caller_data(stub)
-
-	if err != nil {
-		return nil, errors.New("Error retrieving caller information")
-	}
 	var b []byte
 	if function == "create_bond" {
-		return t.create_bond(stub, caller, caller_affiliation, args)
+		return t.create_bond(stub, args)
 	} else if function == "ping" {
 		return t.ping(stub)
 	} else if function == "tranfer_bond" { // If the function is not a create then there must be a car so we need to retrieve the car.
@@ -260,7 +214,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		if err != nil {
 			return nil, errors.New("cannot find bond by given realestateID")
 		}
-		b, err = t.transfer_ownership(stub, bond, caller, caller_affiliation, args[1])
+		b, err = t.transfer_ownership(stub, bond, args[1])
 
 		if err != nil {
 			fmt.Printf("INVOKE: Error retrieving v5c: %s", err)
@@ -278,16 +232,6 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 //=================================================================================================================================
 func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 
-	caller, caller_affiliation, err := t.get_caller_data(stub)
-	if err != nil {
-		fmt.Printf("QUERY: Error retrieving caller details %s", err)
-		return nil, errors.New("QUERY: Error retrieving caller details: " + err.Error())
-	}
-
-	logger.Debug("function: ", function)
-	logger.Debug("caller: ", caller)
-	logger.Debug("affiliation: ", caller_affiliation)
-
 	if function == "get_bond_details" {
 		if len(args) != 1 {
 			fmt.Printf("Incorrect number of arguments passed")
@@ -298,11 +242,11 @@ func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 			fmt.Printf("QUERY: Error retrieving v5c: %s", err)
 			return nil, errors.New("QUERY: Error retrieving v5c " + err.Error())
 		}
-		return t.get_bond_details(stub, b, caller, caller_affiliation)
+		return t.get_bond_details(stub, b)
 	} else if function == "check_unique_real_estate_id" {
-		return t.check_unique_read_estate_id(stub, args[0], caller, caller_affiliation)
+		return t.check_unique_read_estate_id(stub, args[0])
 	} else if function == "get_bonds" {
-		return t.get_bonds(stub, caller, caller_affiliation)
+		return t.get_bonds(stub)
 	} else if function == "get_ecert" {
 		return t.get_ecert(stub, args[0])
 	} else if function == "ping" {
@@ -327,7 +271,7 @@ func (t *SimpleChaincode) ping(stub shim.ChaincodeStubInterface) ([]byte, error)
 //=================================================================================================================================
 //	 Create Vehicle - Creates the initial JSON for the vehcile and then saves it to the ledger.
 //=================================================================================================================================
-func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, caller string, caller_affiliation string, args []string) ([]byte, error) {
+func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 
 	var b Bond
 
@@ -347,12 +291,6 @@ func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, caller s
 
 	if record != nil {
 		return nil, errors.New("Bond already exists")
-	}
-
-	if caller_affiliation != AUTHORITY { // Only the regulator can create a new v5c
-
-		return nil, errors.New(fmt.Sprintf("Permission Denied. create_vehicle. %v === %v", caller_affiliation, AUTHORITY))
-
 	}
 
 	_, err = t.save_changes(stub, b)
@@ -399,7 +337,7 @@ func (t *SimpleChaincode) create_bond(stub shim.ChaincodeStubInterface, caller s
 //=================================================================================================================================
 //	 authority_to_manufacturer
 //=================================================================================================================================
-func (t *SimpleChaincode) transfer_ownership(stub shim.ChaincodeStubInterface, b Bond, caller string, caller_affiliation string, recipient_national_id string) ([]byte, error) {
+func (t *SimpleChaincode) transfer_ownership(stub shim.ChaincodeStubInterface, b Bond, recipient_national_id string) ([]byte, error) {
 
 	b.OwnerNationalID = recipient_national_id // then make the owner the new owner
 
@@ -415,7 +353,7 @@ func (t *SimpleChaincode) transfer_ownership(stub shim.ChaincodeStubInterface, b
 }
 
 //=================================================================================================================================
-func (t *SimpleChaincode) get_bond_details(stub shim.ChaincodeStubInterface, b Bond, caller string, caller_affiliation string) ([]byte, error) {
+func (t *SimpleChaincode) get_bond_details(stub shim.ChaincodeStubInterface, b Bond) ([]byte, error) {
 
 	bytes, err := json.Marshal(b)
 
@@ -429,7 +367,7 @@ func (t *SimpleChaincode) get_bond_details(stub shim.ChaincodeStubInterface, b B
 //	 get_vehicles
 //=================================================================================================================================
 
-func (t *SimpleChaincode) get_bonds(stub shim.ChaincodeStubInterface, caller string, caller_affiliation string) ([]byte, error) {
+func (t *SimpleChaincode) get_bonds(stub shim.ChaincodeStubInterface) ([]byte, error) {
 	bytes, err := stub.GetState("bondIDs")
 
 	if err != nil {
@@ -457,7 +395,7 @@ func (t *SimpleChaincode) get_bonds(stub shim.ChaincodeStubInterface, caller str
 			return nil, errors.New("Failed to retrieve bondIDs")
 		}
 
-		temp, err = t.get_bond_details(stub, b, caller, caller_affiliation)
+		temp, err = t.get_bond_details(stub, b)
 
 		if err == nil {
 			result += string(temp) + ","
@@ -476,7 +414,7 @@ func (t *SimpleChaincode) get_bonds(stub shim.ChaincodeStubInterface, caller str
 //=================================================================================================================================
 //	 check_unique_v5c
 //=================================================================================================================================
-func (t *SimpleChaincode) check_unique_read_estate_id(stub shim.ChaincodeStubInterface, readEstateID string, caller string, caller_affiliation string) ([]byte, error) {
+func (t *SimpleChaincode) check_unique_read_estate_id(stub shim.ChaincodeStubInterface, readEstateID string) ([]byte, error) {
 	_, err := t.retrieve_bond(stub, readEstateID)
 	if err == nil {
 		return []byte("false"), errors.New("ReadEstateID is not unique")
